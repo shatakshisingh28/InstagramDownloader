@@ -54,7 +54,7 @@ python app.py
 App will run on http://localhost:5000
 
 
-##💖 Credits
+## 💖 Credits
 Built with Flask & yt-dlp
 
 Designed by Shatakshi Singh
