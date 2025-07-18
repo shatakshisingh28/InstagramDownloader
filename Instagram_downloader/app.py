@@ -1,38 +1,66 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
-import os
+from flask import Flask, render_template, request, jsonify, send_file, Response
 import yt_dlp
+import os
+import requests
+from urllib.parse import urlparse
+from io import BytesIO
 
 app = Flask(__name__)
-app.secret_key = "secret123"
 
-DOWNLOAD_DIR = os.path.join("static", "downloads")
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+@app.route('/')
+def home():
+    return render_template('index.html')
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    if request.method == "POST":
-        url = request.form.get("url")
-        if not url:
-            flash("Please enter a URL.", "danger")
-            return redirect(url_for("index"))
+@app.route('/preview', methods=['POST'])
+def preview():
+    url = request.json.get('url')
 
-        try:
-            ydl_opts = {
-                "outtmpl": os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s"),
-            }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
-            flash("Video downloaded successfully!", "success")
-        except Exception as e:
-            flash(f"Error: {e}", "danger")
+    if not url:
+        return jsonify({'error': 'No URL provided'}), 400
 
-        return redirect(url_for("index"))
+    try:
+        ydl_opts = {
+            'quiet': True,
+            'skip_download': True,
+        }
 
-    # List files (latest first)
-    files = os.listdir(DOWNLOAD_DIR)
-    files = sorted(files, key=lambda f: os.path.getmtime(os.path.join(DOWNLOAD_DIR, f)), reverse=True)
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            title = info.get('title')
+            uploader = info.get('uploader')
+            thumbnail = info.get('thumbnail')
+            video_url = info.get('url')
 
-    return render_template("index.html", files=files)
+            return jsonify({
+                'title': title,
+                'uploader': uploader,
+                'thumbnail': thumbnail,
+                'video_url': video_url
+            })
 
-if __name__ == "__main__":
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/download')
+def download():
+    video_url = request.args.get('video_url')
+    filename = request.args.get('filename', 'video.mp4')
+
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    response = requests.get(video_url, stream=True, headers=headers)
+    file_stream = BytesIO(response.content)
+
+    return send_file(file_stream, as_attachment=True, download_name=filename, mimetype='video/mp4')
+
+@app.route('/thumbnail_proxy')
+def thumbnail_proxy():
+    url = request.args.get('url')
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers)
+        return Response(response.content, content_type=response.headers['Content-Type'])
+    except Exception as e:
+        return f"Error loading image: {e}", 500
+
+if __name__ == '__main__':
     app.run(debug=True)
