@@ -16,7 +16,7 @@ A clean, mobile-friendly Flask-based web application to download Instagram Reels
 
 ## 🖼️ Demo Screenshot
 
-![App Screenshot](https://yourdomain.com/static/screenshot.png)
+![App Screenshot](InstaPreview.png)
 
 ---
 
